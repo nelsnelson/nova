@@ -210,7 +210,7 @@ def get_image_metadata(context, image_api, image_id_or_uri, instance):
         # the image still needs to be pulled from glance.
         if cached_image and
             ('properties' not in cached_image or len(cached_image) > 1):
-            return image
+            return cached_image
 
     # If the base image is still available, get its metadata
     try:
