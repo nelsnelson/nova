@@ -196,6 +196,22 @@ def _get_unused_letter(used_letters):
 
 
 def get_image_metadata(context, image_api, image_id_or_uri, instance):
+    # Get the system metadata from the instance
+    system_meta = utils.instance_sys_meta(instance)
+
+    # If the id or uri is the same as the instance image reference then
+    # try to get the the meta_data from instance system meta data
+    if image_id_or_uri == instance.image_ref:
+        image = utils.get_image_from_system_metadata(system_meta)
+
+        # If the image has not been cached already, then it will only
+        # be populated with a 'properties' entry and might not
+        # have some necessary information in it such as status, or
+        # disk_format, in which case, it must be retrieved from the
+        # image api -- otherwise, the remote call may be skipped
+        if image and ('properties' not in image or len(image) > 1):
+            return image
+
     # If the base image is still available, get its metadata
     try:
         image = image_api.get(context, image_id_or_uri)
@@ -209,9 +225,6 @@ def get_image_metadata(context, image_api, image_id_or_uri, instance):
     else:
         flavor = flavors.extract_flavor(instance)
         image_system_meta = utils.get_system_metadata_from_image(image, flavor)
-
-    # Get the system metadata from the instance
-    system_meta = utils.instance_sys_meta(instance)
 
     # Merge the metadata from the instance with the image's, if any
     system_meta.update(image_system_meta)
