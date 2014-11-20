@@ -2315,10 +2315,29 @@ class LibvirtDriver(driver.ComputeDriver):
             greenthread.sleep(1)
         return False
 
+    def _get_cached_image_metadata(self, instance):
+        # Get the system metadata from the instance
+        system_meta = utils.instance_sys_meta(instance)
+        cached_image = utils.get_image_from_system_metadata(system_meta)
+
+        if cached_image:
+            # If the instance has inheritable properties, but no other
+            # image metadata cached in system metadata, the dictionary
+            # would have only inheritable properties and this is not
+            # sufficient for represent an image.
+            if 'properties' not in cached_image or len(cached_image) > 1:
+                return cached_image
+
     def _get_image_metadata(self, context, instance):
-            image_ref = instance.image_ref
-            return compute_utils.get_image_metadata(context, self._image_api,
-                                                    image_ref, instance)
+        cached_image = self._get_cached_image_metadata(instance)
+        if cached_image:
+            return cached_image
+
+        # No cached image meta data available.
+        # Pull the image from glance.
+        image_ref = instance.image_ref
+        return compute_utils.get_image_metadata(context, self._image_api,
+                                                image_ref, instance)
 
     def _get_disk_info(self, context, instance, block_device_info,
                       image_meta=None):

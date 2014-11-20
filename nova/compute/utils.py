@@ -196,35 +196,25 @@ def _get_unused_letter(used_letters):
 
 
 def get_image_metadata(context, image_api, image_id_or_uri, instance):
+    image_system_meta = {}
+    # In case of boot from volume, image_id_or_uri may be None
+    if image_id_or_uri is not None:
+        # If the base image is still available, get its metadata
+        try:
+            image = image_api.get(context, image_id_or_uri)
+        except (exception.ImageNotAuthorized,
+                exception.ImageNotFound,
+                exception.Invalid) as e:
+            LOG.warning(_LW("Can't access image %(image_id)s: %(error)s"),
+                        {"image_id": image_id_or_uri, "error": e},
+                        instance=instance)
+        else:
+            flavor = flavors.extract_flavor(instance)
+            image_system_meta = utils.get_system_metadata_from_image(image,
+                                                                     flavor)
+
     # Get the system metadata from the instance
     system_meta = utils.instance_sys_meta(instance)
-
-    # It is only safe to use cached image metadata when the requested image
-    # is the same as the instance's image.
-    if image_id_or_uri == instance.image_ref:
-        cached_image = utils.get_image_from_system_metadata(system_meta)
-
-        # If the instance has inheritable properties, but no other
-        # image metadata cached in system metadata, we will get a
-        # dictionary with only the inheritable properties. In that case,
-        # the image still needs to be pulled from glance.
-        if cached_image and \
-            ('properties' not in cached_image or len(cached_image) > 1):
-            return cached_image
-
-    # If the base image is still available, get its metadata
-    try:
-        image = image_api.get(context, image_id_or_uri)
-    except (exception.ImageNotAuthorized,
-            exception.ImageNotFound,
-            exception.Invalid) as e:
-        LOG.warning(_LW("Can't access image %(image_id)s: %(error)s"),
-                    {"image_id": image_id_or_uri, "error": e},
-                    instance=instance)
-        image_system_meta = {}
-    else:
-        flavor = flavors.extract_flavor(instance)
-        image_system_meta = utils.get_system_metadata_from_image(image, flavor)
 
     # Merge the metadata from the instance with the image's, if any
     system_meta.update(image_system_meta)
